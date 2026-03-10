@@ -47,3 +47,34 @@ h1 {
 .cardsContainer {
     min-height: 200px;
 }
+
+.createTaskForm {
+    padding: 16px;
+}
+
+.taskInput {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+textarea.taskInput {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.createButton {
+    width: 100%;
+    padding: 8px;
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+.createButton:disabled {
+    background: darkgray;
+}
