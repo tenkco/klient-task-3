@@ -41,7 +41,7 @@ h1 {
 
 .columnHeader h2 {
     font-size: 16px;
-    color: darkred;
+    color: white;
 }
 
 .cardsContainer {
@@ -62,7 +62,6 @@ h1 {
 
 textarea.taskInput {
     min-height: 60px;
-    resize: vertical;
 }
 
 .createButton {
@@ -77,4 +76,41 @@ textarea.taskInput {
 
 .createButton:disabled {
     background: darkgray;
+}
+
+.taskCard {
+    background: white;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+.taskHeader {
+    margin-bottom: 8px;
+}
+
+.taskHeader h3 {
+    font-size: 14px;
+    color: darkred;
+    margin-bottom: 4px;
+}
+
+.taskDate {
+    font-size: 12px;
+    color: darkgray;
+}
+
+.taskDescription {
+    font-size: 13px;
+    color: darkgray;
+    margin-bottom: 8px;
+}
+
+.taskFooter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: darkred;
+    padding-top: 6px;
 }

@@ -7,33 +7,63 @@ Vue.component('app', {
             <div class="columns">
                 <column 
                     column-index="1"
-                    title="Запланированные задачи">
+                    title="Запланированные задачи"
+                    :tasks="tasks.column1"
+                    @create-task="createTask">
                 </column>
                 
                 <column 
                     column-index="2"
-                    title="Задачи в работе">
+                    title="Задачи в работе"
+                    :tasks="tasks.column2">
                 </column>
                 
                 <column 
                     column-index="3"
-                    title="Тестирование">
+                    title="Тестирование"
+                    :tasks="tasks.column3">
                 </column>
                 
                 <column 
                     column-index="4"
-                    title="Выполненные задачи">
+                    title="Выполненные задачи"
+                    :tasks="tasks.column4">
                 </column>
             </div>
         </div>
-    `
+    `,
+    data() {
+        return {
+            tasks: {
+                column1: [],
+                column2: [],
+                column3: [],
+                column4: []
+            },
+            nextId: 1
+        };
+    },
+    methods: {
+        createTask(taskData) {
+            const newTask = {
+                id: this.nextId++,
+                ...taskData,
+                createdAt: new Date().toISOString(),
+                editedAt: null,
+                status: 'planned'
+            };
+
+            this.tasks.column1.push(newTask);
+        }
+    }
 });
 
 //колонки
 Vue.component('column', {
     props: {
         columnIndex: String,
-        title: String
+        title: String,
+        tasks: Array
     },
     template: `
         <div class="column" :class="'column-' + columnIndex">
@@ -46,11 +76,50 @@ Vue.component('column', {
                     @create-task="createTask">
                 </create-task-form>
             </div>
+            <task-card
+                 v-for="task in tasks"
+                 :key="task.id"
+                 :task="task"
+                 :column-index="columnIndex">
+            </task-card>
         </div>
     `,
     methods: {
         createTask(taskData) {
             this.$emit('create-task', taskData);
+        }
+    }
+});
+
+Vue.component('task-card', {
+    props: {
+        task: Object,
+        columnIndex: String
+    },
+    template: `
+        <div class="taskCard">
+            <div class="taskHeader">
+                <h3>{{ task.title }}</h3>
+                <span class="taskDate">Создано: {{ formatDate(task.createdAt) }}</span>
+            </div>
+            
+            <p class="taskDescription">{{ task.description }}</p>
+            
+            <div class="taskFooter">
+                <span class="taskDeadline">Дедлайн: {{ formatDate(task.deadline) }}</span>
+            </div>
+        </div>
+    `,
+    methods: {
+        formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
         }
     }
 });
