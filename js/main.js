@@ -11,21 +11,26 @@ Vue.component('app', {
                     :tasks="tasks.column1"
                     @create-task="createTask"
                     @edit-task="editTask"
-                    @delete-task="deleteTask">
+                    @delete-task="deleteTask"
+                    @move-forward="moveForward">
                 </column>
                 
                 <column 
                     column-index="2"
                     title="Задачи в работе"
                     :tasks="tasks.column2"
-                    @edit-task="editTask">
+                    @edit-task="editTask"
+                    @@move-forward="moveForward"
+                    @move-backward="moveBackward">
                 </column>
                 
                 <column 
                     column-index="3"
                     title="Тестирование"
                     :tasks="tasks.column3"
-                    @edit-task="editTask">
+                    @edit-task="editTask"
+                    @move-forward="moveForward"
+                    @move-backward="moveBackward">
                 </column>
                 
                 <column 
@@ -58,28 +63,67 @@ Vue.component('app', {
             };
 
             this.tasks.column1.push(newTask);
+        },
+
+        editTask(data) {
+            const { taskId, columnIndex, updatedTask } = data;
+            const column = `column${columnIndex}`;
+            const taskIndex = this.tasks[column].findIndex(t => t.id === taskId);
+
+            if (taskIndex !== -1) {
+                this.tasks[column].splice(taskIndex, 1, updatedTask);
+            }
+        },
+
+        deleteTask(data) {
+            const { taskId, columnIndex } = data;
+            const column = `column${columnIndex}`;
+            const taskIndex = this.tasks[column].findIndex(t => t.id === taskId);
+
+            if (taskIndex !== -1) {
+                this.tasks[column].splice(taskIndex, 1);
+            }
+        },
+
+        moveForward(data) {
+            const { taskId, fromColumn } = data;
+            const fromCol = `column${fromColumn}`;
+            const toCol = `column${parseInt(fromColumn) + 1}`;
+
+            const taskIndex = this.tasks[fromCol].findIndex(t => t.id === taskId);
+            if (taskIndex === -1) return;
+
+            const [movedTask] = this.tasks[fromCol].splice(taskIndex, 1);
+
+            if (parseInt(fromColumn) + 1 === 4) {
+                movedTask.completedAt = new Date().toISOString();
+                movedTask.isOverdue = new Date(movedTask.deadline) < new Date();
+                movedTask.isOnTime = !movedTask.isOverdue;
+            }
+
+            this.tasks[toCol].push(movedTask);
+        },
+
+        moveBackward(data) {
+            const { taskId, fromColumn } = data;
+
+            const reason = prompt('Укажите причину возврата задачи:');
+            if (!reason) return;
+
+            const fromCol = `column${fromColumn}`;
+            const toCol = `column${parseInt(fromColumn) - 1}`;
+
+            const taskIndex = this.tasks[fromCol].findIndex(t => t.id === taskId);
+            if (taskIndex === -1) return;
+
+            const [movedTask] = this.tasks[fromCol].splice(taskIndex, 1);
+            movedTask.returnReason = reason;
+            movedTask.returnedAt = new Date().toISOString();
+
+            this.tasks[toCol].push(movedTask);
         }
+
     },
-
-    editTask(data) {
-        const { taskId, columnIndex, updatedTask } = data;
-        const column = `column${columnIndex}`;
-        const taskIndex = this.tasks[column].findIndex(t => t.id === taskId);
-
-        if (taskIndex !== -1) {
-            this.tasks[column].splice(taskIndex, 1, updatedTask);
-        }
-    },
-
-    deleteTask(data) {
-        const { taskId, columnIndex } = data;
-        const column = `column${columnIndex}`;
-        const taskIndex = this.tasks[column].findIndex(t => t.id === taskId);
-
-        if (taskIndex !== -1) {
-            this.tasks[column].splice(taskIndex, 1);
-        }
-    }
 });
 
 //колонки
@@ -104,13 +148,29 @@ Vue.component('column', {
                  v-for="task in tasks"
                  :key="task.id"
                  :task="task"
-                 :column-index="columnIndex">
+                 :column-index="columnIndex"
+                 @edit-task="editTask"
+                 @delete-task="deleteTask"
+                 @move-forward="moveForward"
+                 @move-backward="moveBackward">
             </task-card>
         </div>
     `,
     methods: {
         createTask(taskData) {
             this.$emit('create-task', taskData);
+        },
+        editTask(data) {
+            this.$emit('edit-task', data);
+        },
+        deleteTask(data) {
+            this.$emit('delete-task', data);
+        },
+        moveForward(data) {
+            this.$emit('move-forward', data);
+        },
+        moveBackward(data) {
+            this.$emit('move-backward', data);
         }
     }
 });
@@ -134,9 +194,23 @@ Vue.component('task-card', {
                 <p class="taskDescription">{{ task.description }}</p>
                 <div class="taskFooter">
                     <span class="taskDeadline">Дедлайн: {{ formatDate(task.deadline) }}</span>
+            </div>
+                
+                <div>
+                    <div class="moveButtons">
+                        <button 
+                            v-if="canMoveForward" 
+                            @click="moveForward" 
+                            class="moveButton">Вперед</button>
+                        <button 
+                            v-if="canMoveBackward && columnIndex === '3'" 
+                            @click="moveBackward" 
+                            class="moveButton">Назад</button>
+                    </div>
                     <button @click="startEditing" class="editButton">Редактировать</button>
                     <button @click="deleteTask" class="deleteButton" v-if="columnIndex === '1'">Удалить</button>
                 </div>
+                
             </div>
             
             <div v-if="isEditing" class="editForm">
@@ -167,6 +241,16 @@ Vue.component('task-card', {
             editedDescription: '',
             editedDeadline: ''
         };
+    },
+
+    computed: {
+        canMoveForward() {
+            return this.columnIndex === '1' || this.columnIndex === '2' ||
+                (this.columnIndex === '3' && !this.isReturnReason);
+        },
+        canMoveBackward() {
+            return this.columnIndex === '3';
+        },
     },
 
     methods: {
@@ -220,6 +304,19 @@ Vue.component('task-card', {
 
         cancelEdit() {
             this.isEditing = false;
+        },
+
+        moveForward() {
+            this.$emit('move-forward', {
+                taskId: this.task.id,
+                fromColumn: this.columnIndex
+            });
+        },
+        moveBackward() {
+            this.$emit('move-backward', {
+                taskId: this.task.id,
+                fromColumn: this.columnIndex
+            });
         }
     }
 });
