@@ -20,7 +20,7 @@ Vue.component('app', {
                     title="Задачи в работе"
                     :tasks="tasks.column2"
                     @edit-task="editTask"
-                    @@move-forward="moveForward"
+                    @move-forward="moveForward"
                     @move-backward="moveBackward">
                 </column>
                 
@@ -52,7 +52,41 @@ Vue.component('app', {
             nextId: 1
         };
     },
+
+    mounted() {
+        this.loadFromStorage();
+    },
+
     methods: {
+        loadFromStorage() {
+            const saved = localStorage.getItem('kanbanTasks');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.tasks = data.tasks || {
+                    column1: [], column2: [], column3: [], column4: []
+                };
+                this.nextId = data.nextId || this.getNextId();
+            }
+        },
+
+        saveToStorage() {
+            const data = {
+                tasks: this.tasks,
+                nextId: this.nextId
+            };
+            localStorage.setItem('kanbanTasks', JSON.stringify(data));
+        },
+
+        getNextId() {
+            let maxId = 0;
+            for (let col in this.tasks) {
+                this.tasks[col].forEach(task => {
+                    if (task.id > maxId) maxId = task.id;
+                });
+            }
+            return maxId + 1;
+        },
+
         createTask(taskData) {
             const newTask = {
                 id: this.nextId++,
@@ -63,6 +97,7 @@ Vue.component('app', {
             };
 
             this.tasks.column1.push(newTask);
+            this.saveToStorage();
         },
 
         editTask(data) {
@@ -72,6 +107,7 @@ Vue.component('app', {
 
             if (taskIndex !== -1) {
                 this.tasks[column].splice(taskIndex, 1, updatedTask);
+                this.saveToStorage();
             }
         },
 
@@ -82,6 +118,7 @@ Vue.component('app', {
 
             if (taskIndex !== -1) {
                 this.tasks[column].splice(taskIndex, 1);
+                this.saveToStorage();
             }
         },
 
@@ -102,6 +139,7 @@ Vue.component('app', {
             }
 
             this.tasks[toCol].push(movedTask);
+            this.saveToStorage();
         },
 
         moveBackward(data) {
@@ -121,6 +159,7 @@ Vue.component('app', {
             movedTask.returnedAt = new Date().toISOString();
 
             this.tasks[toCol].push(movedTask);
+            this.saveToStorage();
         }
 
     },
@@ -143,17 +182,18 @@ Vue.component('column', {
                     v-if="columnIndex === '1'"
                     @create-task="createTask">
                 </create-task-form>
+                <task-card
+                     v-for="task in tasks"
+                     :key="task.id"
+                     :task="task"
+                     :column-index="columnIndex"
+                     @edit-task="editTask"
+                     @delete-task="deleteTask"
+                     @move-forward="moveForward"
+                     @move-backward="moveBackward">
+                </task-card>
             </div>
-            <task-card
-                 v-for="task in tasks"
-                 :key="task.id"
-                 :task="task"
-                 :column-index="columnIndex"
-                 @edit-task="editTask"
-                 @delete-task="deleteTask"
-                 @move-forward="moveForward"
-                 @move-backward="moveBackward">
-            </task-card>
+            
         </div>
     `,
     methods: {
@@ -209,6 +249,17 @@ Vue.component('task-card', {
                     </div>
                     <button @click="startEditing" class="editButton">Редактировать</button>
                     <button @click="deleteTask" class="deleteButton" v-if="columnIndex === '1'">Удалить</button>
+                </div>
+                
+                <div v-if="task.returnReason" class="returnInfo">
+                    <span class="returnReason">Причина возврата: {{ task.returnReason }}</span>
+                    <span class="returnDate">{{ formatDate(task.returnedAt) }}</span>
+                </div>
+                
+                <div v-if="columnIndex === '4'" class="deadlineStatus">
+                    <span :class="task.isOverdue ? 'overdue' : 'onTime'">
+                        {{ task.isOverdue ? 'Просрочена' : 'Выполнена в срок' }}
+                    </span>
                 </div>
                 
             </div>
