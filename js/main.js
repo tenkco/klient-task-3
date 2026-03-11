@@ -9,19 +9,23 @@ Vue.component('app', {
                     column-index="1"
                     title="Запланированные задачи"
                     :tasks="tasks.column1"
-                    @create-task="createTask">
+                    @create-task="createTask"
+                    @edit-task="editTask"
+                    @delete-task="deleteTask">
                 </column>
                 
                 <column 
                     column-index="2"
                     title="Задачи в работе"
-                    :tasks="tasks.column2">
+                    :tasks="tasks.column2"
+                    @edit-task="editTask">
                 </column>
                 
                 <column 
                     column-index="3"
                     title="Тестирование"
-                    :tasks="tasks.column3">
+                    :tasks="tasks.column3"
+                    @edit-task="editTask">
                 </column>
                 
                 <column 
@@ -54,6 +58,26 @@ Vue.component('app', {
             };
 
             this.tasks.column1.push(newTask);
+        }
+    },
+
+    editTask(data) {
+        const { taskId, columnIndex, updatedTask } = data;
+        const column = `column${columnIndex}`;
+        const taskIndex = this.tasks[column].findIndex(t => t.id === taskId);
+
+        if (taskIndex !== -1) {
+            this.tasks[column].splice(taskIndex, 1, updatedTask);
+        }
+    },
+
+    deleteTask(data) {
+        const { taskId, columnIndex } = data;
+        const column = `column${columnIndex}`;
+        const taskIndex = this.tasks[column].findIndex(t => t.id === taskId);
+
+        if (taskIndex !== -1) {
+            this.tasks[column].splice(taskIndex, 1);
         }
     }
 });
@@ -98,18 +122,53 @@ Vue.component('task-card', {
     },
     template: `
         <div class="taskCard">
-            <div class="taskHeader">
+            <div v-if="!isEditing" class="taskHeader">
                 <h3>{{ task.title }}</h3>
                 <span class="taskDate">Создано: {{ formatDate(task.createdAt) }}</span>
+                <span v-if="task.editedAt" class="taskDate">
+                    (ред. {{ formatDate(task.editedAt) }})
+                </span>
             </div>
             
-            <p class="taskDescription">{{ task.description }}</p>
-            
-            <div class="taskFooter">
-                <span class="taskDeadline">Дедлайн: {{ formatDate(task.deadline) }}</span>
+            <div v-if="!isEditing">
+                <p class="taskDescription">{{ task.description }}</p>
+                <div class="taskFooter">
+                    <span class="taskDeadline">Дедлайн: {{ formatDate(task.deadline) }}</span>
+                    <button @click="startEditing" class="editButton">Редактировать</button>
+                    <button @click="deleteTask" class="deleteButton" v-if="columnIndex === '1'">Удалить</button>
+                </div>
             </div>
+            
+            <div v-if="isEditing" class="editForm">
+                <input 
+                    v-model="editedTitle" 
+                    class="editInput" 
+                    placeholder="Заголовок">
+                <textarea 
+                    v-model="editedDescription" 
+                    class="editInput" 
+                    placeholder="Описание"></textarea>
+                <input 
+                    type="datetime-local" 
+                    v-model="editedDeadline" 
+                    class="editInput">
+                <div class="editButtons">
+                    <button @click="saveEdit" class="saveButton">Сохранить</button>
+                    <button @click="cancelEdit" class="cancelButton">Отмена</button>
+                </div>
+            </div>
+            
         </div>
     `,
+    data() {
+        return {
+            isEditing: false,
+            editedTitle: '',
+            editedDescription: '',
+            editedDeadline: ''
+        };
+    },
+
     methods: {
         formatDate(dateString) {
             const date = new Date(dateString);
@@ -120,6 +179,47 @@ Vue.component('task-card', {
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        },
+
+        startEditing() {
+            this.editedTitle = this.task.title;
+            this.editedDescription = this.task.description;
+            this.editedDeadline = this.task.deadline.slice(0, 16);
+            this.isEditing = true;
+        },
+        saveEdit() {
+            if (!this.editedTitle.trim() || !this.editedDescription.trim() || !this.editedDeadline) {
+                return;
+            }
+
+            const updatedTask = {
+                ...this.task,
+                title: this.editedTitle,
+                description: this.editedDescription,
+                deadline: this.editedDeadline,
+                editedAt: new Date().toISOString()
+            };
+
+            this.$emit('edit-task', {
+                taskId: this.task.id,
+                columnIndex: this.columnIndex,
+                updatedTask: updatedTask
+            });
+
+            this.isEditing = false;
+        },
+
+        deleteTask() {
+            if (confirm('Удалить задачу?')) {
+                this.$emit('delete-task', {
+                    taskId: this.task.id,
+                    columnIndex: this.columnIndex
+                });
+            }
+        },
+
+        cancelEdit() {
+            this.isEditing = false;
         }
     }
 });

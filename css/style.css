@@ -114,3 +114,44 @@ textarea.taskInput {
     color: darkred;
     padding-top: 6px;
 }
+
+.editButton, .deleteButton {
+    background: none;
+    border: none;
+    color: darkred;
+    font-size: 14px;
+}
+
+.editForm {
+    padding: 8px;
+}
+
+.editInput {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 8px;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.editButtons {
+    display: flex;
+    gap: 8px;
+}
+
+.saveButton, .cancelButton {
+    flex: 1;
+    padding: 6px;
+    border: none;
+    font-size: 12px;
+}
+
+.saveButton {
+    background: darkred;
+    color: white;
+}
+
+.cancelButton {
+    background: black;
+    color: white;
+}
