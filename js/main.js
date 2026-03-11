@@ -12,7 +12,8 @@ Vue.component('app', {
                     @create-task="createTask"
                     @edit-task="editTask"
                     @delete-task="deleteTask"
-                    @move-forward="moveForward">
+                    @move-forward="moveForward"
+                    @reorder="reorderCards">
                 </column>
                 
                 <column 
@@ -21,7 +22,8 @@ Vue.component('app', {
                     :tasks="tasks.column2"
                     @edit-task="editTask"
                     @move-forward="moveForward"
-                    @move-backward="moveBackward">
+                    @move-backward="moveBackward"
+                    @reorder="reorderCards">
                 </column>
                 
                 <column 
@@ -30,13 +32,15 @@ Vue.component('app', {
                     :tasks="tasks.column3"
                     @edit-task="editTask"
                     @move-forward="moveForward"
-                    @move-backward="moveBackward">
+                    @move-backward="moveBackward"
+                    @reorder="reorderCards">
                 </column>
                 
                 <column 
                     column-index="4"
                     title="Выполненные задачи"
-                    :tasks="tasks.column4">
+                    :tasks="tasks.column4"
+                    @reorder="reorderCards">
                 </column>
             </div>
         </div>
@@ -160,6 +164,17 @@ Vue.component('app', {
 
             this.tasks[toCol].push(movedTask);
             this.saveToStorage();
+        },
+
+        reorderCards(data) {
+            const { columnIndex, taskId, fromIndex, toIndex } = data;
+            const column = `column${columnIndex}`;
+
+            if (toIndex < 0 || toIndex >= this.tasks[column].length) return;
+            const [movedTask] = this.tasks[column].splice(fromIndex, 1);
+            this.tasks[column].splice(toIndex, 0, movedTask);
+
+            this.saveToStorage();
         }
 
     },
@@ -177,25 +192,43 @@ Vue.component('column', {
             <div class="columnHeader">
                 <h2>{{ title }}</h2>
             </div>
+            <button @click="sortByPriority" v-if="tasks.length > 0" class="sortButton"> 
+                    Сортировать по приоритету
+            </button>
             <div class="cardsContainer">
                 <create-task-form 
                     v-if="columnIndex === '1'"
                     @create-task="createTask">
                 </create-task-form>
                 <task-card
-                     v-for="task in tasks"
+                     v-for="(task, idx) in tasks"
                      :key="task.id"
                      :task="task"
+                     :task-index="idx"
                      :column-index="columnIndex"
+                     :column-has-urgent="hasUrgentTask"
                      @edit-task="editTask"
                      @delete-task="deleteTask"
                      @move-forward="moveForward"
-                     @move-backward="moveBackward">
+                     @move-backward="moveBackward"
+                     @reorder="reorderCards">
                 </task-card>
             </div>
             
         </div>
     `,
+    computed: {
+        hasUrgentTask() {
+            return this.tasks.some(task => {
+                if (!task.deadline) return false;
+                const now = new Date();
+                const deadline = new Date(task.deadline);
+                const diffHours = (deadline - now) / (1000 * 60 * 60);
+                return diffHours <= 24 && diffHours > 0;
+            });
+        }
+    },
+
     methods: {
         createTask(taskData) {
             this.$emit('create-task', taskData);
@@ -211,6 +244,28 @@ Vue.component('column', {
         },
         moveBackward(data) {
             this.$emit('move-backward', data);
+        },
+        sortByPriority() {
+            const sorted = [...this.tasks].sort((a, b) => a.priority - b.priority);
+            const newOrder = sorted.map(task => task.id);
+
+            newOrder.forEach((taskId, newIndex) => {
+                const currentIndex = this.tasks.findIndex(t => t.id === taskId);
+                if (currentIndex !== newIndex) {
+                    this.$emit('reorder', {
+                        columnIndex: this.columnIndex,
+                        taskId: taskId,
+                        fromIndex: currentIndex,
+                        toIndex: newIndex
+                    });
+                }
+            });
+        },
+        reorderCards(data) {
+            this.$emit('reorder', {
+                columnIndex: this.columnIndex,
+                ...data
+            });
         }
     }
 });
@@ -218,10 +273,12 @@ Vue.component('column', {
 Vue.component('task-card', {
     props: {
         task: Object,
-        columnIndex: String
+        columnIndex: String,
+        taskIndex: Number,
+        columnHasUrgent: Boolean
     },
     template: `
-        <div class="taskCard">
+        <div class="taskCard" :class="{ 'urgent': isUrgent, 'blocked': isBlocked }">
             <div v-if="!isEditing" class="taskHeader">
                 <h3>{{ task.title }}</h3>
                 <span class="taskDate">Создано: {{ formatDate(task.createdAt) }}</span>
@@ -235,20 +292,26 @@ Vue.component('task-card', {
                 <div class="taskFooter">
                     <span class="taskDeadline">Дедлайн: {{ formatDate(task.deadline) }}</span>
             </div>
+            
+            <span class="priority" :class="'priority-' + task.priority">
+                    Приоритет: {{ task.priority }}
+            </span>
                 
                 <div>
                     <div class="moveButtons">
                         <button 
                             v-if="canMoveForward" 
                             @click="moveForward" 
+                            class="moveButton"
                             class="moveButton">Вперед</button>
                         <button 
                             v-if="canMoveBackward && columnIndex === '3'" 
-                            @click="moveBackward" 
+                            @click="moveBackward"
+                            class="moveButton"
                             class="moveButton">Назад</button>
                     </div>
-                    <button @click="startEditing" class="editButton">Редактировать</button>
-                    <button @click="deleteTask" class="deleteButton" v-if="columnIndex === '1'">Удалить</button>
+                    <button @click="startEditing" class="editButton" :disabled="isBlocked">Редактировать</button>
+                    <button @click="deleteTask" class="deleteButton" v-if="columnIndex === '1'" :disabled="isBlocked">Удалить</button>
                 </div>
                 
                 <div v-if="task.returnReason" class="returnInfo">
@@ -296,12 +359,23 @@ Vue.component('task-card', {
 
     computed: {
         canMoveForward() {
-            return this.columnIndex === '1' || this.columnIndex === '2' ||
-                (this.columnIndex === '3' && !this.isReturnReason);
+            if (this.isBlocked) return false;
+            return this.columnIndex === '1' || this.columnIndex === '2' || this.columnIndex === '3';
         },
         canMoveBackward() {
+            if (this.isBlocked) return false;
             return this.columnIndex === '3';
         },
+        isUrgent() {
+            if (!this.task.deadline) return false;
+            const now = new Date();
+            const deadline = new Date(this.task.deadline);
+            const diffHours = (deadline - now) / (1000 * 60 * 60);
+            return diffHours <= 24 && diffHours > 0;
+        },
+        isBlocked() {
+            return this.columnHasUrgent && !this.isUrgent;
+        }
     },
 
     methods: {
@@ -368,6 +442,33 @@ Vue.component('task-card', {
                 taskId: this.task.id,
                 fromColumn: this.columnIndex
             });
+        },
+
+        moveUp() {
+            this.$emit('reorder', {
+                taskId: this.task.id,
+                fromIndex: this.taskIndex,
+                toIndex: this.taskIndex - 1
+            });
+        },
+
+        moveDown() {
+            this.$emit('reorder', {
+                taskId: this.task.id,
+                fromIndex: this.taskIndex,
+                toIndex: this.taskIndex + 1
+            });
+        },
+
+        canEdit() {
+            if (this.columnIndex === '1' && this.hasUrgentInColumn()) {
+                return false;
+            }
+            return true;
+        },
+
+        hasUrgentInColumn() {
+            return false;
         }
     }
 });
@@ -390,6 +491,13 @@ Vue.component('create-task-form', {
                 type="datetime-local" 
                 v-model="deadline"
                 class="taskInput">
+                
+            <select v-model="priority" class="taskInput">
+                <option value="1">Приоритет 1 (Высокий)</option>
+                <option value="2">Приоритет 2 (Средний)</option>
+                <option value="3">Приоритет 3 (Низкий)</option>
+            </select>
+            
             <button 
                 @click="createTask"
                 :disabled="!isValid"
@@ -402,7 +510,8 @@ Vue.component('create-task-form', {
         return {
             title: '',
             description: '',
-            deadline: ''
+            deadline: '',
+            priority: '1'
         };
     },
     computed: {
@@ -417,7 +526,8 @@ Vue.component('create-task-form', {
             this.$emit('create-task', {
                 title: this.title,
                 description: this.description,
-                deadline: this.deadline
+                deadline: this.deadline,
+                priority: parseInt(this.priority)
             });
 
             this.title = '';

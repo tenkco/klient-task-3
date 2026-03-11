@@ -215,3 +215,42 @@ textarea.taskInput {
     padding: 2px 8px;
     border-radius: 3px;
 }
+
+.sortButtons button {
+    padding: 2px 6px;
+    margin: 0 2px;
+}
+
+.priority {
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 10px;
+    font-size: 11px;
+}
+
+.sortButton{
+    width: 100%;
+    padding: 8px;
+    background: darkred;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+@keyframes blink {
+    0% { background-color: #ffcccc; }
+    50% { background-color: #ff6666; }
+    100% { background-color: #ffcccc; }
+}
+
+.taskCard.urgent {
+    animation: blink 1s infinite;
+}
+
+.taskCard.blocked {
+    background-color: gray !important;
+    filter: grayscale(50%);
+    pointer-events: none;
+}
